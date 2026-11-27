@@ -43,8 +43,7 @@ HARM_DOMAINS = [
     "No Material Harm",
 ]
 
-# Order as listed on the dataset card. Check the Subtask 2b Codabench page /
-# aliases.json before relying on numeric IDs for drivers.
+# Order as listed on the dataset card.
 RISK_DRIVERS = [
     "Risky Requested Outcome",
     "Untrusted / Conflicting Instructions",
@@ -104,7 +103,7 @@ _DOMAIN_ALIASES = {
     "Environmental": ["environment"],
     "No Material Harm": ["nmh"],
 }
-# Only canonical names for drivers (2b aliases not checked yet).
+# Drivers are matched by canonical name only.
 _DRIVER_ALIASES: dict[str, list[str]] = {}
 
 _DOMAIN_LOOKUP = _build_lookup(HARM_DOMAINS, _DOMAIN_ALIASES)

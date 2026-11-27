@@ -76,7 +76,6 @@ def _client_with_fake(**opts):
 
 
 def test_reasoning_effort_is_sent_when_set():
-    # Ollama ignores chat_template_kwargs; it turns thinking off via reasoning_effort="none".
     client, fake = _client_with_fake(reasoning_effort="none")
     assert client.chat([{"role": "user", "content": "x"}]) == '{"risk_severity": 2}'
     assert fake.kwargs["reasoning_effort"] == "none"
