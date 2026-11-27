@@ -7,7 +7,7 @@ One model predicts all three outputs:
 
 Cross-validation: 5 folds on TRAIN, grouped by scenario (split_manifest.jsonl),
 so paired items never sit on both sides. Each fold model also predicts the
-target split (dev, or test later); those predictions are averaged
+target split (dev or test); those predictions are averaged
 (5-model ensemble). Dev is never used for training or tuning.
 
 Long inputs are truncated from the LEFT, so the final proposed action (the

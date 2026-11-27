@@ -1,9 +1,8 @@
 """B0: majority-class baseline.
 
 Predicts the most frequent training severity and the most frequent training
-label set for domains and drivers, for every example. Its dev scores should
-match the official "Majority" baseline (ST1 MAE 1.294, ST2a/2b Jaccard 0.455).
-That check confirms data loading and metrics are correct.
+label set for domains and drivers, for every example. On dev it reproduces the
+official "Majority" baseline (ST1 MAE 1.294, ST2a/2b Jaccard 0.455).
 
     python scripts/b0_majority.py --data-dir data --split dev --out runs/b0/dev.jsonl
 """
@@ -23,7 +22,7 @@ from agentrisk.data import load_split, write_jsonl  # noqa: E402
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--data-dir", default="data")
-    ap.add_argument("--split", default="dev", help="split to predict (dev, or test later)")
+    ap.add_argument("--split", default="dev", help="split to predict (dev or test)")
     ap.add_argument("--out", default="runs/b0/dev.jsonl")
     args = ap.parse_args()
 

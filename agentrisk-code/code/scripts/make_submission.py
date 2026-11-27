@@ -5,8 +5,6 @@
 The ZIP contains `predictions.jsonl` with example_id + risk_severity,
 risk_domains and risk_drivers, so the same file can be uploaded to the
 Subtask 1, 2a and 2b competitions. Use --tasks to restrict the fields.
-Then check it with the official evaluator from the Starting Kit:
-    python3 evaluate.py submissions/s1_dev.zip --task 1
 """
 
 from __future__ import annotations

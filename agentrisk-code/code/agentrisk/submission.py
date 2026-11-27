@@ -9,8 +9,6 @@ at its root, one JSON object per line, exactly one line per example, e.g.
 Each subtask is a separate competition (1: 18508, 2a: 18509, 2b: 18510).
 Only the field for that subtask is required; other target fields are ignored,
 so one file with all three fields can be uploaded to each competition.
-Always check with the official local evaluator from the Starting Kit:
-    python3 evaluate.py submission.zip --task 1
 """
 
 from __future__ import annotations

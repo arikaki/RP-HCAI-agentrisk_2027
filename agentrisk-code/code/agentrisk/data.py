@@ -21,7 +21,7 @@ def write_jsonl(path: str | Path, records: list[dict]) -> None:
 
 
 def load_split(split: str, data_dir: str | Path | None = None) -> list[dict]:
-    """Load a split ("train", "dev", or a test file later).
+    """Load a split ("train", "dev" or "test").
 
     If `data_dir` contains `<split>.jsonl` it is used; otherwise the split is
     downloaded from Hugging Face with the `datasets` library.
@@ -30,7 +30,7 @@ def load_split(split: str, data_dir: str | Path | None = None) -> list[dict]:
         path = Path(data_dir) / f"{split}.jsonl"
         if path.exists():
             return read_jsonl(path)
-    from datasets import load_dataset  # imported lazily
+    from datasets import load_dataset
 
     ds = load_dataset(HF_DATASET, split=split)
     return [dict(r) for r in ds]

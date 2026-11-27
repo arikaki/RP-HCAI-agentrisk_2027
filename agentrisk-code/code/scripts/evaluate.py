@@ -4,8 +4,7 @@
 
 Prints a Markdown results table (with 95% bootstrap confidence intervals).
 Options:
-  --ids FILE      only score the example IDs listed in FILE (one per line),
-                  e.g. the DevOps slice for RQ3.
+  --ids FILE      only score the example IDs listed in FILE (one per line).
   --compare A B   paired bootstrap test: is A better than B on each subtask?
 """
 
