@@ -42,6 +42,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from agentrisk.data import grouped_folds, load_groups, load_split, write_jsonl  # noqa: E402
 from agentrisk.labels import HARM_DOMAINS, RISK_DRIVERS, repair_label_set  # noqa: E402
 from agentrisk.metrics import mae, mean_jaccard  # noqa: E402
+from agentrisk.training import fold_collapsed  # noqa: E402
 
 
 def set_seed(seed: int) -> None:
@@ -140,10 +141,10 @@ def predict(model, loader, device, use_bf16: bool) -> tuple[np.ndarray, np.ndarr
     return torch.cat(sevs).numpy(), torch.cat(doms).numpy(), torch.cat(drvs).numpy()
 
 
-def train_fold(args, train_rows, val_rows, target_rows, tokenizer, device, fold: int):
+def train_fold(args, train_rows, val_rows, target_rows, tokenizer, device, fold: int, seed: int):
     from transformers import get_linear_schedule_with_warmup
 
-    set_seed(args.seed + fold)
+    set_seed(seed)
     model = MultiHeadModel(args.model, grad_ckpt=not args.no_grad_ckpt).to(device)
     collate = Collator(tokenizer, args.max_len)
     train_dl = DataLoader(TrajDataset(train_rows), batch_size=args.batch_size, shuffle=True, collate_fn=collate)
@@ -195,6 +196,34 @@ def train_fold(args, train_rows, val_rows, target_rows, tokenizer, device, fold:
     return val_out, tgt_out
 
 
+def run_fold(args, train, tr_idx, va_idx, target, tokenizer, device, k: int, cache_dir: Path):
+    """Train one fold, retrying with a new seed if it fails to learn.
+
+    Outputs are cached in cache_dir; --reuse-folds loads them instead of training.
+    """
+    cache = cache_dir / f"fold{k + 1}.npz"
+    tr_rows, va_rows = [train[i] for i in tr_idx], [train[i] for i in va_idx]
+    va_sev = [r["risk_severity"] for r in va_rows]
+    if args.reuse_folds and cache.exists():
+        z = np.load(cache)
+        print(f"  fold {k + 1}: loaded {cache}")
+        return (z["vs"], z["vd"], z["vv"]), (z["ts"], z["td"], z["tv"]), json.loads(str(z["entry"]))
+    for attempt in range(args.max_restarts + 1):
+        seed = args.seed + k + 1000 * attempt
+        (vs, vd, vv), (ts, td, tv) = train_fold(args, tr_rows, va_rows, target, tokenizer, device, k, seed)
+        va_pred = [int(np.clip(np.rint(s), 1, 5)) for s in vs]
+        collapsed = fold_collapsed(va_sev, va_pred, [r["risk_severity"] for r in tr_rows])
+        if not collapsed:
+            break
+        print(f"  fold {k + 1}: failed to learn with seed {seed}"
+              + ("; retrying with a new seed" if attempt < args.max_restarts else "; keeping it"))
+    entry = {"fold": k + 1, "seed": seed, "attempts": attempt + 1, "collapsed": collapsed,
+             "val_mae": mae(va_sev, va_pred)}
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    np.savez(cache, vs=vs, vd=vd, vv=vv, ts=ts, td=td, tv=tv, entry=json.dumps(entry))
+    return (vs, vd, vv), (ts, td, tv), entry
+
+
 def best_threshold(rows, sev, dom, drv) -> float:
     """Pick the label threshold that maximises mean Jaccard on out-of-fold predictions."""
     best_t, best_score = 0.5, -1.0
@@ -226,6 +255,10 @@ def main() -> None:
     ap.add_argument("--no-bf16", action="store_true")
     ap.add_argument("--no-grad-ckpt", action="store_true")
     ap.add_argument("--limit-train", type=int, help="use only N training rows (smoke test)")
+    ap.add_argument("--max-restarts", type=int, default=2,
+                    help="retrain a fold with a new seed this many times if it fails to learn")
+    ap.add_argument("--reuse-folds", action="store_true",
+                    help="load fold outputs cached by an earlier run instead of retraining them")
     ap.add_argument("--seed", type=int, default=13)
     ap.add_argument("--runs-dir", default="runs")
     args = ap.parse_args()
@@ -251,10 +284,12 @@ def main() -> None:
     n = len(train)
     oof_sev, oof_dom, oof_drv = np.zeros(n), np.zeros((n, len(HARM_DOMAINS))), np.zeros((n, len(RISK_DRIVERS)))
     tgt_sev, tgt_dom, tgt_drv = [], [], []
+    fold_log = []
     for k, (tr_idx, va_idx) in enumerate(folds):
         print(f"fold {k + 1}/{len(folds)}: {len(tr_idx)} train / {len(va_idx)} val")
-        (vs, vd, vv), (ts, td, tv) = train_fold(args, [train[i] for i in tr_idx], [train[i] for i in va_idx],
-                                                 target, tokenizer, device, k)
+        (vs, vd, vv), (ts, td, tv), entry = run_fold(args, train, tr_idx, va_idx, target, tokenizer,
+                                                     device, k, out_dir / "folds")
+        fold_log.append(entry)
         oof_sev[va_idx], oof_dom[va_idx], oof_drv[va_idx] = vs, vd, vv
         tgt_sev.append(ts)
         tgt_dom.append(td)
@@ -268,6 +303,7 @@ def main() -> None:
         "cv_mae": mae([r["risk_severity"] for r in train], [p["risk_severity"] for p in oof]),
         "cv_jaccard_domains": mean_jaccard([r["risk_domains"] for r in train], [p["risk_domains"] for p in oof]),
         "cv_jaccard_drivers": mean_jaccard([r["risk_drivers"] for r in train], [p["risk_drivers"] for p in oof]),
+        "folds": fold_log,
     }
     (out_dir / "cv_metrics.json").write_text(json.dumps(cv, indent=2))
     print("cross-validation on train:", json.dumps(cv))

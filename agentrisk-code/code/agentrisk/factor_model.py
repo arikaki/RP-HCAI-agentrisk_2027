@@ -1,9 +1,5 @@
 """Predict severity from the seven S1 factor ratings with a small trained model.
 
-The S1 decision prompt maps high factor ratings straight to severity 5, far
-more often than the training labels do. These models learn the mapping from
-factor ratings to severity on the training set instead.
-
 Models (all take the seven ratings as features):
   logreg-argmax   multinomial logistic regression, most likely class
   logreg-median   same model, median of the predicted distribution, which
@@ -77,7 +73,7 @@ def make_model(name: str):
 
 
 def apply_consistency(pred: dict) -> dict:
-    """Severity 1 goes with 'No Material Harm' / 'No Material Risk' (262 of 265 train items)."""
+    """Give severity-1 predictions the labels 'No Material Harm' and 'No Material Risk'."""
     if pred["risk_severity"] != 1:
         return pred
     return {**pred, "risk_domains": [NO_HARM], "risk_drivers": [NO_RISK]}
