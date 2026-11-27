@@ -68,10 +68,24 @@ def clean_factors(obj: dict | None) -> dict | None:
     return out if len(out) == len(RISK_FACTORS) and all(f["rating"] for f in out.values()) else None
 
 
+def rate_factors(client: ChatClient, traj: str, temperature: float) -> tuple[str, dict | None]:
+    raw = client.chat(s1_factor_messages(traj), temperature=temperature)
+    factors = clean_factors(extract_json(raw))
+    if factors is None:  # one retry on unparseable output
+        raw = client.chat(s1_factor_messages(traj), temperature=max(temperature, 0.3))
+        factors = clean_factors(extract_json(raw))
+    return raw, factors
+
+
 def judge_one(client: ChatClient, method: str, row: dict, temperature: float) -> dict:
     t0 = time.time()
     traj = row["formatted_interaction"]
     rec: dict = {"example_id": row["example_id"]}
+    if method == "factors":
+        raw_f, factors = rate_factors(client, traj, temperature)
+        rec.update(raw_factors=raw_f, factors=factors, factors_ok=factors is not None,
+                   parse_ok=factors is not None, repaired=False, seconds=round(time.time() - t0, 2))
+        return rec
     if method == "b1":
         raw = client.chat(b1_messages(traj), temperature=temperature)
         obj = extract_json(raw)
@@ -80,11 +94,7 @@ def judge_one(client: ChatClient, method: str, row: dict, temperature: float) ->
             obj = extract_json(raw)
         rec["raw"] = raw
     else:
-        raw_f = client.chat(s1_factor_messages(traj), temperature=temperature)
-        factors = clean_factors(extract_json(raw_f))
-        if factors is None:
-            raw_f = client.chat(s1_factor_messages(traj), temperature=max(temperature, 0.3))
-            factors = clean_factors(extract_json(raw_f))
+        raw_f, factors = rate_factors(client, traj, temperature)
         rec["raw_factors"] = raw_f
         rec["factors"] = factors
         raw = client.chat(s1_decision_messages(traj, factors or {"note": "factor rating failed"}),
@@ -103,9 +113,18 @@ def judge_one(client: ChatClient, method: str, row: dict, temperature: float) ->
     return rec
 
 
+def write_factor_ratings(rows: list[dict], by_id: dict[str, list[dict]], path: Path) -> None:
+    out = [{"example_id": r["example_id"], "factors": by_id[r["example_id"]][0]["factors"]}
+           for r in rows if r["example_id"] in by_id]
+    write_jsonl(path, out)
+    n_missing = sum(o["factors"] is None for o in out) + len(rows) - len(out)
+    print(f"wrote factor ratings for {len(out)} examples -> {path}; missing or unparseable: {n_missing}")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--method", choices=["b1", "s1"], required=True)
+    ap.add_argument("--method", choices=["b1", "s1", "factors"], required=True,
+                    help="factors = only the S1 factor-rating call (input for factor_severity.py)")
     ap.add_argument("--model", required=True, help="model name as the server knows it, or 'mock'")
     ap.add_argument("--tag", help="short name for the output folder (default: model name)")
     ap.add_argument("--base-url", default="http://localhost:8000/v1")
@@ -187,6 +206,9 @@ def main() -> None:
     for r in read_jsonl(raw_path):
         if r.get("split") == args.split and r["sample"] < args.n_samples:
             by_id.setdefault(r["example_id"], []).append(r)
+    if args.method == "factors":
+        write_factor_ratings(rows, by_id, out_dir / f"{args.split}.jsonl")
+        return
     preds, n_bad, n_rep = [], 0, 0
     for row in rows:
         samples = sorted(by_id.get(row["example_id"], []), key=lambda r: r["sample"])
