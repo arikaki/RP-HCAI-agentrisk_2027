@@ -1,0 +1,15 @@
+# Core (data, metrics, B0, LLM judges)
+datasets>=2.19
+huggingface_hub>=0.23
+openai>=1.40
+scikit-learn>=1.4
+numpy>=1.26
+
+# Fine-tuning (S2a). Install PyTorch with CUDA first, following pytorch.org for your system.
+torch>=2.3
+transformers>=4.48   # ModernBERT support starts at 4.48
+
+# Serving a local LLM for B1/S1: install ONE of these separately (not pinned here)
+#   vllm          (Linux / WSL2, fastest batched inference)
+#   ollama        (Windows/macOS/Linux app; https://ollama.com)
+#   llama.cpp     (llama-server; supports CPU offload for larger models)
