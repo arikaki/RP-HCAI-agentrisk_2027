@@ -1,7 +1,7 @@
 """Combine several sampled judgments of the same example into one prediction.
 
-Severity: median of the samples (rounded), plus the spread as a confidence
-signal. Labels: the most frequent labels across samples (at most 2), with the
+Severity: median of the samples (rounded). Confidence is the share of samples
+that agree with it; the standard deviation is kept as well. Labels: the most frequent labels across samples (at most 2), with the
 "No Material ..." rule applied.
 """
 
@@ -15,8 +15,10 @@ from .labels import repair_label_set
 
 def aggregate(samples: list[dict]) -> dict:
     sevs = [s["risk_severity"] for s in samples]
+    severity = int(round(statistics.median(sevs)))
     out = {
-        "risk_severity": int(round(statistics.median(sevs))),
+        "risk_severity": severity,
+        "severity_confidence": sevs.count(severity) / len(sevs),
         "severity_std": statistics.pstdev(sevs) if len(sevs) > 1 else 0.0,
         "severity_samples": sevs,
         "n_samples": len(samples),

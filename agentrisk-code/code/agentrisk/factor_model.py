@@ -44,10 +44,18 @@ class _LogReg:
         return self
 
     def predict(self, X) -> np.ndarray:
-        if not self.use_median:
-            return self.model.predict(X).astype(int)
+        return self.predict_with_confidence(X)[0]
+
+    def predict_with_confidence(self, X) -> tuple[np.ndarray, np.ndarray]:
+        """Predicted severities and the model's probability for each of them."""
         probs = self.model.predict_proba(X)
-        return np.array([median_class(p, self.model.classes_) for p in probs])
+        classes = self.model.classes_
+        if self.use_median:
+            pred = np.array([median_class(p, classes) for p in probs])
+        else:
+            pred = classes[np.argmax(probs, axis=1)].astype(int)
+        conf = probs[np.arange(len(pred)), np.searchsorted(classes, pred)]
+        return pred, conf
 
 
 class _RidgeRound:
@@ -60,6 +68,9 @@ class _RidgeRound:
 
     def predict(self, X) -> np.ndarray:
         return np.clip(np.rint(self.model.predict(X)), 1, 5).astype(int)
+
+    def predict_with_confidence(self, X) -> tuple[np.ndarray, None]:
+        return self.predict(X), None
 
 
 def make_model(name: str):

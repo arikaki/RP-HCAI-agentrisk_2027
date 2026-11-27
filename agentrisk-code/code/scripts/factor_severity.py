@@ -54,12 +54,16 @@ def predict_target(model, target_preds: list[dict]) -> tuple[list[dict], int]:
     out, n_fallback = [], 0
     for p in target_preds:
         vec = factor_vector(p.get("factors"))
+        conf = None
         if vec is None:
             n_fallback += 1
             sev = int(p["risk_severity"])
         else:
-            sev = int(model.predict(np.array([vec]))[0])
-        out.append(apply_consistency({**p, "risk_severity": sev, "severity_llm": p["risk_severity"]}))
+            pred, confs = model.predict_with_confidence(np.array([vec]))
+            sev = int(pred[0])
+            conf = None if confs is None else round(float(confs[0]), 4)
+        out.append(apply_consistency({**p, "risk_severity": sev, "severity_llm": p["risk_severity"],
+                                      "severity_confidence": conf}))
     return out, n_fallback
 
 

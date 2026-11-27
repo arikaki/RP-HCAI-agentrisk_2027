@@ -71,6 +71,28 @@ def macro_f1(gold: Sequence[str], pred: Sequence[str], labels: Sequence[str] | N
     return sum(f1s) / len(f1s) if f1s else 0.0
 
 
+def expected_calibration_error(conf: Sequence[float], correct: Sequence[int], n_bins: int = 10) -> float:
+    """Weighted mean gap between confidence and accuracy over equal-width confidence bins."""
+    n = len(conf)
+    total = 0.0
+    for b in range(n_bins):
+        lo, hi = b / n_bins, (b + 1) / n_bins
+        idx = [i for i, c in enumerate(conf) if lo < c <= hi or (b == 0 and c == 0.0)]
+        if idx:
+            acc = sum(correct[i] for i in idx) / len(idx)
+            avg_conf = sum(conf[i] for i in idx) / len(idx)
+            total += len(idx) / n * abs(acc - avg_conf)
+    return total
+
+
+def defer_least_confident(gold: Sequence, pred: Sequence, conf: Sequence[float],
+                          fraction: float) -> tuple[list[int], list[int]]:
+    """Indices kept by the judge and indices handed to a human (the least confident `fraction`)."""
+    order = sorted(range(len(gold)), key=lambda i: conf[i])
+    n_defer = round(fraction * len(gold))
+    return order[n_defer:], order[:n_defer]
+
+
 def bootstrap_ci(metric: Callable[[list, list], float], gold: list, pred: list,
                  n_boot: int = 1000, alpha: float = 0.05, seed: int = 13) -> tuple[float, float]:
     rng = random.Random(seed)

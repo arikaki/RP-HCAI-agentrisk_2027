@@ -47,6 +47,23 @@ def test_labels():
     assert labs == ["Privacy / Confidentiality"] and not rep
 
 
+def test_expected_calibration_error():
+    from agentrisk.metrics import expected_calibration_error
+
+    # well calibrated: 80% confident and right 4 times out of 5
+    assert expected_calibration_error([0.8] * 5, [1, 1, 1, 1, 0]) < 1e-9
+    # always 100% confident but right half the time
+    assert abs(expected_calibration_error([1.0] * 4, [1, 0, 1, 0]) - 0.5) < 1e-9
+
+
+def test_defer_least_confident():
+    from agentrisk.metrics import defer_least_confident
+
+    gold, pred, conf = [1, 2, 3, 4], [1, 2, 1, 1], [0.9, 0.8, 0.2, 0.3]
+    kept, deferred = defer_least_confident(gold, pred, conf, fraction=0.5)
+    assert sorted(kept) == [0, 1] and sorted(deferred) == [2, 3]
+
+
 def test_metrics():
     assert mae([4, 5, 3], [3, 5, 1]) == 1.0
     assert mean_jaccard([["A", "B"]], [["A"]]) == 0.5
@@ -99,6 +116,7 @@ def test_aggregate():
     assert out["risk_domains"] == ["Financial / Assets"]
     assert out["risk_drivers"] == ["Scope / Safeguard Failure"]
     assert out["severity_std"] > 0
+    assert abs(out["severity_confidence"] - 2 / 3) < 1e-9
 
 
 if __name__ == "__main__":

@@ -43,6 +43,17 @@ def test_models_learn_a_monotonic_mapping():
         assert list(model.predict(np.array([[1.0] * 7, [3.0] * 7, [4.0] * 7]))) == [1, 3, 4], name
 
 
+def test_confidence_is_probability_of_predicted_class():
+    rng = np.random.default_rng(0)
+    y = rng.choice([1, 3, 4], size=150)
+    X = np.repeat(y[:, None], 7, axis=1) + rng.normal(0, 0.3, size=(150, 7))
+    model = make_model("logreg-median").fit(X, y)
+    pred, conf = model.predict_with_confidence(np.array([[1.0] * 7, [2.0] * 7]))
+    assert pred[0] == 1 and conf[0] > 0.9
+    assert 0.0 < conf[1] < conf[0]
+    assert make_model("ridge-round").fit(X, y).predict_with_confidence(X[:2])[1] is None
+
+
 def test_apply_consistency_does_not_mutate_input():
     pred = {"risk_severity": 1, "risk_domains": ["Privacy / Confidentiality"],
             "risk_drivers": ["Authorization / Consent Failure"]}

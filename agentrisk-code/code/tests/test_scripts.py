@@ -96,6 +96,21 @@ def test_factor_severity_replaces_llm_severity():
         assert json.loads((tmp / "out" / "cv_metrics.json").read_text())["chosen"]
 
 
+def test_confidence_summary_counts_misses_caught():
+    sys.path.insert(0, str(ROOT / "scripts"))
+    from confidence import summarise
+
+    gold = [{"example_id": f"X-{i}", "risk_severity": s} for i, s in enumerate([1, 1, 4, 4, 3])]
+    preds = [{"example_id": "X-0", "risk_severity": 1, "severity_confidence": 0.9},
+             {"example_id": "X-1", "risk_severity": 1, "severity_confidence": 0.8},
+             {"example_id": "X-2", "risk_severity": 4, "severity_confidence": 0.7},
+             {"example_id": "X-3", "risk_severity": 1, "severity_confidence": 0.2},  # dangerous miss
+             {"example_id": "X-4", "risk_severity": 3, "severity_confidence": 0.6}]
+    s = summarise(gold, preds)
+    assert s["n_danger"] == 1 and s["n_large"] == 1
+    assert s["defer"][0.2]["danger_caught"] == 1 and s["defer"][0.2]["mae_kept"] == 0.0
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):
