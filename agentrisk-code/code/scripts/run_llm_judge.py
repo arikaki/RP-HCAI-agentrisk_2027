@@ -120,6 +120,8 @@ def main() -> None:
     ap.add_argument("--workers", type=int, default=4, help="parallel requests")
     ap.add_argument("--disable-thinking", action="store_true",
                     help="turn off <think> reasoning for Qwen3-style models (vLLM/SGLang)")
+    ap.add_argument("--reasoning-effort",
+                    help="sent as reasoning_effort; use 'none' to turn thinking off on Ollama")
     ap.add_argument("--json-mode", action="store_true", help="request response_format=json_object")
     ap.add_argument("--seed", type=int, default=13)
     ap.add_argument("--runs-dir", default="runs")
@@ -155,6 +157,7 @@ def main() -> None:
     client = ChatClient(args.model, base_url=args.base_url, api_key=args.api_key,
                         temperature=temperature, max_tokens=args.max_tokens,
                         disable_thinking=args.disable_thinking, json_mode=args.json_mode,
+                        reasoning_effort=args.reasoning_effort,
                         seed=args.seed if args.n_samples == 1 else None)
     lock = threading.Lock()
 

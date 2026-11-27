@@ -61,11 +61,14 @@ def extract_json(text: str) -> dict | None:
 class ChatClient:
     def __init__(self, model: str, base_url: str = "http://localhost:8000/v1",
                  api_key: str = "EMPTY", temperature: float = 0.0, max_tokens: int = 1024,
-                 disable_thinking: bool = False, json_mode: bool = False, seed: int | None = None):
+                 disable_thinking: bool = False, json_mode: bool = False, seed: int | None = None,
+                 reasoning_effort: str | None = None):
         self.model = model
         self.temperature = temperature
         self.max_tokens = max_tokens
         self.seed = seed
+        # Ollama ignores chat_template_kwargs; "none" turns thinking off there.
+        self.reasoning_effort = reasoning_effort
         self.extra_body: dict = {}
         if disable_thinking:
             # Understood by vLLM / SGLang chat templates (e.g. Qwen3-style models).
@@ -86,6 +89,8 @@ class ChatClient:
                       max_tokens=self.max_tokens)
         if self.seed is not None:
             kwargs["seed"] = self.seed
+        if self.reasoning_effort is not None:
+            kwargs["reasoning_effort"] = self.reasoning_effort
         if self.extra_body:
             kwargs["extra_body"] = self.extra_body
         if self.json_mode:

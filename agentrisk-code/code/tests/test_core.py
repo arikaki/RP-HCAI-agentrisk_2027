@@ -56,6 +56,38 @@ def test_metrics():
     assert macro_f1(["a", "b"], ["a", "b"]) == 1.0
 
 
+class _FakeCompletions:
+    def __init__(self):
+        self.kwargs = None
+
+    def create(self, **kwargs):
+        self.kwargs = kwargs
+        msg = type("M", (), {"content": '{"risk_severity": 2}'})
+        return type("R", (), {"choices": [type("C", (), {"message": msg})]})
+
+
+def _client_with_fake(**opts):
+    from agentrisk.llm import ChatClient
+
+    client = ChatClient("some-model", **opts)
+    fake = _FakeCompletions()
+    client.client = type("O", (), {"chat": type("Ch", (), {"completions": fake})})
+    return client, fake
+
+
+def test_reasoning_effort_is_sent_when_set():
+    # Ollama ignores chat_template_kwargs; it turns thinking off via reasoning_effort="none".
+    client, fake = _client_with_fake(reasoning_effort="none")
+    assert client.chat([{"role": "user", "content": "x"}]) == '{"risk_severity": 2}'
+    assert fake.kwargs["reasoning_effort"] == "none"
+
+
+def test_reasoning_effort_is_omitted_by_default():
+    client, fake = _client_with_fake()
+    client.chat([{"role": "user", "content": "x"}])
+    assert "reasoning_effort" not in fake.kwargs
+
+
 def test_aggregate():
     samples = [
         {"risk_severity": 3, "risk_domains": ["Financial / Assets"], "risk_drivers": ["Scope / Safeguard Failure"]},

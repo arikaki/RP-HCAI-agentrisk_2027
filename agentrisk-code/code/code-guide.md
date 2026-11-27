@@ -81,6 +81,11 @@ vllm serve <model-id-or-local-path> --max-model-len 8192 --gpu-memory-utilizatio
 # Option B: Ollama
 ollama pull <model-tag>
 #   -> base URL http://localhost:11434/v1, use --base-url and --model <model-tag>
+#   Ollama may default to a 4,096-token context and silently cut long prompts.
+#   The longest dev prompt is about 3,600 tokens plus the answer, so make an 8k variant:
+#     Modelfile:  FROM qwen3.5:9b
+#                 PARAMETER num_ctx 8192
+#     ollama create qwen3.5-9b-8k -f Modelfile
 ```
 
 ### Run the judges (second terminal)
@@ -103,6 +108,7 @@ Useful options:
 | Option | When |
 |---|---|
 | `--disable-thinking` | Qwen3-style "thinking" models on vLLM: faster, shorter answers. Leave it off to let the model reason (then raise `--max-tokens` to about 4096). `<think>` blocks are stripped either way. |
+| `--reasoning-effort none` | The same for **Ollama**, which ignores `--disable-thinking`. With Qwen3.5-9B this cuts about 720 thinking tokens per call to about 100 (about 15 s → 2–5 s). |
 | `--n-samples 5` | Several samples per example (temperature 0.7): median severity, majority labels, and `severity_std` as a confidence signal |
 | `--workers 4` | Parallel requests. vLLM handles 4–8 well; Ollama may need 1–2 |
 | `--json-mode` | If the server supports `response_format=json_object` and answers often fail to parse |
